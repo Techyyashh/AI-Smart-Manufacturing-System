@@ -1,0 +1,26 @@
+[
+  {
+    "username": "operator",
+    "name": "Ravi Kumar (Operator)",
+    "role": "operator",
+    "salt": "98d2474235fa98555a6e39e803b958e7",
+    "hash": "1e3d46da244064c641e1e2a729a012af86596f1532deee89fecf2bd222019470dad0296a3d0c06dfbc47f5c47e6067842669f23fdac451f1f911b134bf3561f5",
+    "active": true
+  },
+  {
+    "username": "maintenance",
+    "name": "Priya Sharma (Maintenance)",
+    "role": "maintenance",
+    "salt": "505ffb210d1be0de3c26a0b87e7e0d73",
+    "hash": "1a22361c3a892e87f9edcc61bed5aa1b0e8cac9a31939581f77e0017b736313b153d69a932a6a5afa847d90edaa9279b85716ca09006681a43711c00f50abd03",
+    "active": true
+  },
+  {
+    "username": "manager",
+    "name": "Yash (Plant Manager)",
+    "role": "manager",
+    "salt": "7626d7dfe3a2cb4c9051cae39c90ab22",
+    "hash": "4901fdd46dd7666b3da7a4134255c972fa6f41a4599c60c6ce18001a4ab9c5528bb89f65f0a0c14fc0270b4bba2e49717ef34b6c539c26ade9d4b4831f41f020",
+    "active": true
+  }
+]

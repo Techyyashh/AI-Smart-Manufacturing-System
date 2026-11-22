@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SmartFactory AI - Industrial Machine Monitoring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet"/>
+<link href="style.css" rel="stylesheet"/>
+<script>
+  // apply saved theme before first paint (no flash)
+  try { const t = localStorage.getItem("sf-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div class="login" id="login">
+  <div class="login-card">
+    <div class="brand" style="padding:0 0 22px">
+      <div class="brand-logo" data-icon="factory"></div>
+      <div><div class="brand-name">SmartFactory AI</div><div class="brand-sub">Industry 4.0 Monitoring</div></div>
+    </div>
+    <h2>Sign in</h2>
+    <p class="muted" style="margin-bottom:18px">Use your plant account to access the monitoring system.</p>
+    <form id="login-form" autocomplete="on">
+      <label for="login-user">Username</label>
+      <input class="input" id="login-user" name="username" autocomplete="username" required/>
+      <label for="login-pass">Password</label>
+      <div class="pass-wrap">
+        <input class="input" id="login-pass" name="password" type="password" autocomplete="current-password" required/>
+        <button type="button" class="pass-toggle" id="pass-toggle">Show</button>
+      </div>
+      <div class="login-error" id="login-error"></div>
+      <button class="btn primary login-btn" type="submit" id="login-btn">Sign in</button>
+    </form>
+
+    <!-- Demo accounts: remove this block for a real deployment -->
+    <div class="demo-accounts">
+      <div class="card-sub" style="margin-bottom:8px">Demo accounts - click to fill in</div>
+      <button type="button" class="demo-acc" data-u="operator" data-p="Operator@123"><b>Operator</b><span>View machines, acknowledge alerts</span></button>
+      <button type="button" class="demo-acc" data-u="maintenance" data-p="Maint@1234"><b>Maintenance</b><span>+ start maintenance, view history</span></button>
+      <button type="button" class="demo-acc" data-u="manager" data-p="Manager@123"><b>Manager</b><span>Full access: energy, demo faults, shift reset, export</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-logo" data-icon="factory"></div>
+      <div>
+        <div class="brand-name">SmartFactory AI</div>
+        <div class="brand-sub">Industry 4.0 Monitoring</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-label">Monitor</div>
+      <button class="nav-btn active" data-page="overview"><span data-icon="grid"></span>Overview</button>
+      <button class="nav-btn" data-page="machine"><span data-icon="cog"></span>Machines</button>
+      <button class="nav-btn" data-page="alerts"><span data-icon="bell"></span>Alerts<span class="nav-badge" id="nav-alert-badge">0</span></button>
+      <div class="nav-label">Analyse</div>
+      <button class="nav-btn" data-page="maintenance"><span data-icon="wrench"></span>Maintenance</button>
+      <button class="nav-btn" data-page="ai"><span data-icon="cpu"></span>AI Insights</button>
+      <button class="nav-btn" data-page="energy" data-perm="energy"><span data-icon="zap"></span>Energy</button>
+      <button class="nav-btn" data-page="history" data-perm="history"><span data-icon="clock"></span>History</button>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="sys-row"><span><i class="sys-dot" id="sys-stream"></i>Live data stream</span><span id="sys-stream-t">-</span></div>
+      <div class="sys-row"><span><i class="sys-dot" id="sys-ai"></i>AI model</span><span id="sys-ai-t">-</span></div>
+      <div class="sys-row"><span><i class="sys-dot" id="sys-db"></i>Database</span><span id="sys-db-t">-</span></div>
+    </div>
+  </aside>
+  <div class="overlay-backdrop" id="backdrop"></div>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menu-btn" aria-label="Open menu"><span data-icon="menu"></span></button>
+      <div class="page-title">
+        <h1 id="page-title">Plant overview</h1>
+        <p id="page-sub">Live status of every machine on the shop floor</p>
+      </div>
+      <div class="topbar-right">
+        <span class="chip hide-sm num" id="shift-chip" title="Simulated shift time">Shift 0h 00m</span>
+        <div class="live-pill" id="live-pill"><span class="pulse"></span><span class="live-text" id="live-text">Connecting...</span></div>
+        <button class="icon-btn" id="bell-btn" title="Alerts"><span data-icon="bell"></span><span class="dot-badge" id="bell-badge">0</span></button>
+        <div class="user-chip" id="user-chip" title="Signed in">
+          <span class="avatar" id="user-avatar">?</span>
+          <div class="user-txt"><b id="user-name">-</b><span id="user-role">-</span></div>
+        </div>
+        <button class="icon-btn" id="logout-btn" title="Sign out"><span data-icon="logout"></span></button>
+        <button class="icon-btn theme-toggle" id="theme-btn" title="Switch light / dark theme">
+          <span class="moon" data-icon="moon"></span><span class="sun" data-icon="sun"></span>
+        </button>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="banner" id="conn-banner">
+        <span data-icon="alert"></span>
+        <div><b>Not connected to the backend.</b> Start it in a terminal with
+          <code>cd backend</code> then <code>npm start</code>. This page reconnects by itself.</div>
+      </div>
+
+      <!-- ================= OVERVIEW ================= -->
+      <section class="page active" id="page-overview">
+        <div class="grid kpis" id="kpis"></div>
+
+        <div>
+          <div class="card-head" style="margin-bottom:12px">
+            <div><div class="card-title">Machines</div><div class="card-sub">Click a machine for full details</div></div>
+            <div class="legend" id="state-legend"></div>
+          </div>
+          <div class="grid machine-grid" id="machine-grid"></div>
+        </div>
+
+        <div class="grid g-21">
+          <div class="card">
+            <div class="card-head">
+              <div><div class="card-title">Live power draw by machine</div><div class="card-sub">kW, last 2 minutes</div></div>
+            </div>
+            <div class="legend" id="power-legend" style="margin-bottom:10px"></div>
+            <div class="chart-box"><canvas id="ch-power"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div><div class="card-title">Recent alerts</div><div class="card-sub">Latest active problems</div></div>
+              <button class="btn sm" data-goto="alerts">View all</button>
+            </div>
+            <div class="alert-list" id="recent-alerts"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">OEE by machine</div><div class="card-sub">Overall Equipment Effectiveness this shift = Availability × Performance × Quality</div></div>
+          </div>
+          <div class="chart-box sm"><canvas id="ch-oee"></canvas></div>
+        </div>
+      </section>
+
+      <!-- ================= MACHINE DETAIL ================= -->
+      <section class="page" id="page-machine">
+        <div class="machine-tabs" id="machine-tabs"></div>
+
+        <div class="card">
+          <div class="detail-head">
+            <div class="ring lg" id="d-ring"></div>
+            <div>
+              <div class="detail-title"><h2 id="d-name">-</h2></div>
+              <div class="detail-meta" id="d-meta"></div>
+              <div class="detail-figs" id="d-figs"></div>
+            </div>
+            <div class="actions">
+              <div id="demo-ctrl" data-perm="demo">
+                <div class="card-sub" style="margin-bottom:8px">Demo controls (manager)</div>
+                <div class="actions-row">
+                  <select class="select" id="fault-select" aria-label="Fault type"></select>
+                  <button class="btn danger" id="fault-btn"><span data-icon="alert"></span>Inject</button>
+                </div>
+              </div>
+              <button class="btn primary" id="maint-btn" data-perm="maintenance"><span data-icon="wrench"></span>Start maintenance</button>
+              <div class="card-sub" id="role-note" data-perm-not="maintenance">Maintenance actions need a Maintenance or Manager login.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="diag" id="d-diag"><span data-icon="alert"></span><div id="d-diag-text"></div></div>
+
+        <div class="grid g-4" id="d-panels">
+          <div class="card"><div class="card-head"><div class="panel-title"><span class="panel-icon" data-icon="cog"></span><div class="card-title">Mechanical</div></div></div><div class="metric-list" id="d-mech"></div></div>
+          <div class="card"><div class="card-head"><div class="panel-title"><span class="panel-icon" data-icon="zap"></span><div class="card-title">Electrical</div></div></div><div class="metric-list" id="d-elec"></div></div>
+          <div class="card"><div class="card-head"><div class="panel-title"><span class="panel-icon" data-icon="box"></span><div class="card-title">Production</div></div><span class="card-sub">this shift</span></div><div id="d-prod"></div></div>
+          <div class="card"><div class="card-head"><div class="panel-title"><span class="panel-icon" data-icon="wrench"></span><div class="card-title">Maintenance</div></div></div><div class="metric-list" id="d-maint"></div></div>
+        </div>
+
+        <div class="grid g-21">
+          <div class="card">
+            <div class="card-head">
+              <div><div class="card-title" id="trend-title">Live trend</div><div class="card-sub">Last 2 minutes, updated every second</div></div>
+              <div class="seg" id="trend-seg"></div>
+            </div>
+            <div class="legend" id="trend-legend" style="margin-bottom:10px"></div>
+            <div class="chart-box"><canvas id="ch-trend"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><div class="card-title">Health vs failure risk</div><div class="card-sub">%, last 2 minutes</div></div></div>
+            <div class="legend" style="margin-bottom:10px">
+              <span><i style="background:var(--s3)"></i>Health score</span>
+              <span><i style="background:var(--s2)"></i>Failure risk</span>
+            </div>
+            <div class="chart-box"><canvas id="ch-health"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= ALERTS ================= -->
+      <section class="page" id="page-alerts">
+        <div class="grid g-4" id="alert-kpis"></div>
+        <div class="card">
+          <div class="toolbar" style="margin-bottom:12px">
+            <div class="seg" id="alert-filter">
+              <button data-f="active" class="active">Active</button>
+              <button data-f="unack">Unacknowledged</button>
+              <button data-f="critical">Critical</button>
+              <button data-f="warning">Warning</button>
+              <button data-f="events">Events</button>
+              <button data-f="all">All</button>
+            </div>
+            <select class="select" id="alert-machine" style="flex:0 0 180px" aria-label="Filter by machine"></select>
+            <span class="spacer"></span>
+            <button class="btn" id="ack-all-btn"><span data-icon="check"></span>Acknowledge all</button>
+          </div>
+          <div class="alert-list" id="alert-list"></div>
+        </div>
+      </section>
+
+      <!-- ================= MAINTENANCE ================= -->
+      <section class="page" id="page-maintenance">
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">Maintenance schedule</div><div class="card-sub">Running hours, wear and remaining useful life (RUL) per machine</div></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Machine</th><th>State</th><th class="r">Total hours</th><th>Since last service</th>
+                <th class="r">Service due</th><th>Wear</th><th class="r">RUL</th><th class="r">Health</th><th></th>
+              </tr></thead>
+              <tbody id="maint-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Maintenance log</div><div class="card-sub">Work orders this session</div></div></div>
+          <div id="maint-log"></div>
+        </div>
+      </section>
+
+      <!-- ================= AI ================= -->
+      <section class="page" id="page-ai">
+        <div class="grid g-12">
+          <div class="card">
+            <div class="model-status" id="model-status"></div>
+            <div style="margin-top:18px">
+              <div class="card-title" style="margin-bottom:10px">What drives the prediction</div>
+              <div id="feature-imp"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><div class="card-title">Failure risk by machine</div><div class="card-sub">Probability of failure predicted from live sensor data</div></div></div>
+            <div id="risk-list"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Failure risk trend</div><div class="card-sub">%, last 2 minutes</div></div></div>
+          <div class="legend" id="risk-legend" style="margin-bottom:10px"></div>
+          <div class="chart-box"><canvas id="ch-risk"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:12px">How predictive maintenance works here</div>
+          <div class="pipeline">
+            <div class="pipe-step"><b>1. Sense</b>Machine sensors stream temperature, vibration, speed, pressure and electrical data every second.</div>
+            <div class="pipe-step"><b>2. Normalise</b>Each reading is compared with that machine's own normal operating values.</div>
+            <div class="pipe-step"><b>3. Predict</b>A Random Forest model (Python, scikit-learn) estimates the probability of failure.</div>
+            <div class="pipe-step"><b>4. Act</b>Alerts, a health score and remaining useful life help schedule maintenance before a breakdown.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= ENERGY ================= -->
+      <section class="page" id="page-energy">
+        <div class="grid g-4" id="energy-kpis"></div>
+        <div class="grid g-2">
+          <div class="card">
+            <div class="card-head"><div><div class="card-title">Total plant power</div><div class="card-sub">kW, last 2 minutes</div></div></div>
+            <div class="chart-box"><canvas id="ch-total-power"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><div class="card-title">Energy used this shift</div><div class="card-sub">kWh by machine</div></div></div>
+            <div class="chart-box"><canvas id="ch-energy"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Electrical readings</div><div class="card-sub">Live values per machine</div></div></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Machine</th><th class="r">Voltage</th><th class="r">Current</th><th class="r">Power</th>
+                <th class="r">Power factor</th><th class="r">Energy (shift)</th><th class="r">Cost (shift)</th><th>Share of energy</th>
+              </tr></thead>
+              <tbody id="energy-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= HISTORY ================= -->
+      <section class="page" id="page-history">
+        <div class="card">
+          <div class="toolbar" style="margin-bottom:12px">
+            <select class="select" id="hist-machine" style="flex:0 0 200px" aria-label="Machine"></select>
+            <select class="select" id="hist-limit" style="flex:0 0 140px" aria-label="Rows">
+              <option value="50">50 rows</option><option value="200" selected>200 rows</option><option value="500">500 rows</option>
+            </select>
+            <button class="btn" id="hist-refresh"><span data-icon="refresh"></span>Refresh</button>
+            <span class="spacer"></span>
+            <span class="card-sub" id="hist-source"></span>
+            <button class="btn primary" id="hist-export" data-perm="export"><span data-icon="download"></span>Export CSV</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Time</th><th>Machine</th><th>State</th><th class="r">Temp °C</th><th class="r">Vib mm/s</th>
+                <th class="r">RPM</th><th class="r">Load %</th><th class="r">Power kW</th><th class="r">Current A</th>
+                <th class="r">Parts</th><th class="r">OEE</th><th class="r">Health</th><th class="r">Risk</th>
+              </tr></thead>
+              <tbody id="hist-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
